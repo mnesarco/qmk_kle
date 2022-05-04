@@ -96,7 +96,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 */
 ```
 
-See example: https://github.com/mnesarco/kmonad_dump/blob/main/example.kbd
+See example: https://github.com/mnesarco/kmonad_dump/blob/main/example_keymap.c
 
 ## Usage:
 
