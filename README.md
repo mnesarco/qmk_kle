@@ -41,7 +41,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
 ## To this:
 
-![Layout Visualization](https://github.com/mnesarco/qmk_kle/raw/main/example_output.jpg)
+![Layout Visualization](https://github.com/mnesarco/qmk_kle/raw/main/example_output.png)
 
 ## Just adding some comments in your keymap file:
 
