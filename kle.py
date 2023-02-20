@@ -35,24 +35,24 @@ code_aliases = {
     "EQL": "=",
     "SPC": "Space",
     "BSPC": "⌫",
-    "PGUP": "⤒",
-    "PGDN": "⤓",
+    "PGUP": "Pag↑",
+    "PGDN": "Pag↓",
     "INS": "Ins",
     "DEL": "Del",
-    "VOLU": "🕪",
-    "VOLD": "🕩",
-    "MUTE": "🕨",
+    "VOLU": "V+",
+    "VOLD": "V-",
+    "MUTE": "Mute",
     "DOT": ".",
     "GRV": "`",
-    "LSFT": "⇧",
-    "RSFT": "⇧",
-    "LCTL": "⎈",
-    "RCTL": "⎈",
-    "LALT": "⎇",
-    "RALT": "⌥",
-    "LGUI": "◆",
-    "RGUI": "◆",
-    "TAB": "↹",
+    "LSFT": "Shift",
+    "RSFT": "Shift",
+    "LCTL": "Ctl",
+    "RCTL": "Ctl",
+    "LALT": "Alt",
+    "RALT": "Alt Gr",
+    "LGUI": "Meta",
+    "RGUI": "Meta",
+    "TAB": "Tab",
     "LBRC": "[",
     "RBRC": "]",
     "LPRN": "(",
@@ -66,21 +66,22 @@ code_aliases = {
     "PIPE": "|",
     "EXLM": "!",
     "DLR": "$",
+    "COLON": ":",
     "HASH": "#",
     "DQUO": '\\"',
     "QUOT": "'",
     "LEFT": "←",
     "RGHT": "→",
     "CAPS": "🄰 Caps",
-    "MNXT": "⏭",
+    "MNXT": "Next",
     "BSLS": "\\\\",
     "PLUS": "+",
     "ASTR": "*",
-    "MPLY": "⏯",
-    "MPRV": "⏮",
+    "MPLY": "Play",
+    "MPRV": "Prev",
     "UP": "↑",
     "DOWN": "↓",
-    "MSTP": "◼",
+    "MSTP": "Stop",
     "SLSH": "/",
     "AT": "@",
     "UNDS": "_",
@@ -93,10 +94,10 @@ code_aliases = {
     "MS_D": "↓m",
     "MS_U": "↑m",
     "MS_R": "→m",
-    "WH_L": "←w",
-    "WH_D": "↓w",
-    "WH_U": "↑w",
-    "WH_R": "→w",
+    "WH_L": "←s",
+    "WH_D": "↓s",
+    "WH_U": "↑s",
+    "WH_R": "→s",
 }
 
 # +-------------------------------------------------------------------------+
@@ -223,20 +224,28 @@ class KeyCap:
                     self.layermap[col] = label_pos[(r,c)]
                     self.colormap[col] = colors[r][c]
 
+    def safe_translate(self, key):
+        key = self.translate(key)
+        if key == '\\\\' or key == '\\"':
+            return key
+        else:
+            return key.replace('\\', '')
 
-    def label(self, keys: Dict[str, str]) -> str:
-        lab = ["", "", "", "", "", "", "", "", "", "", "", ""]
-        for layer, key in keys.items():
+    def label(self, keys: Dict[str, str], only_layer=None) -> str:
+        if only_layer:
+            layer, key = only_layer, keys[only_layer]
             if key:
-                p = self.layermap.get(layer, None)
-                key = self.translate(key)
-                if p is not None:
-                    if key == '\\\\' or key == '\\"':
-                        lab[p] = key
-                    else:
-                        lab[p] = key.replace('\\', '')
-        content = re.sub(r'(\\n)+$', '', "\\n".join(lab))
-        return f'"{content}"'
+                return f'"{self.safe_translate(key)}"'
+            return '""'
+        else:
+            lab = ["", "", "", "", "", "", "", "", "", "", "", ""]
+            for layer, key in keys.items():
+                if key:
+                    p = self.layermap.get(layer, None)
+                    if p is not None:
+                        lab[p] = self.safe_translate(key)
+            content = re.sub(r'(\\n)+$', '', "\\n".join(lab))
+            return f'"{content}"'
 
     def get_colors(self):
         lab = ["", "", "", "", "", "", "", "", "", "", "", ""]
@@ -302,6 +311,19 @@ class HardwareLayout:
         self.options = Options(data)
         self.description = self.get_description(data)
         self.import_labels(data)
+        self.output_params = self.get_output_parameters(data)
+
+    def get_output_parameters(self, data):
+        p = re.compile(r'''[(]
+            \s*
+            out
+            \s+
+            (?P<name>[^\s)]+)
+            [)]''', re.X | re.DOTALL)
+        params = {'layers': False}
+        for m in p.finditer(data):
+            params[m.group("name")] = True
+        return params
 
     def import_labels(self, data):
         p = re.compile(r'''[(]
@@ -380,9 +402,41 @@ class QMKKeymapFile:
                     self.first = sec.group('layer')
             self.hardware = HardwareLayout(text)
             self.name = str(Path(file).absolute())
-            self.layout = self.build()
+            if self.hardware.output_params.get("layers", False):
+                self.layout = self.build_by_layers()
+            else:
+                self.layout = self.build_combined()
 
-    def build(self) -> str:
+    def build_by_layers(self) -> str:
+        hw = self.layers['defsrc'].rows
+        nrows = []
+        for r, row in enumerate(hw):
+            nrow = []
+            for c, k in enumerate(row):
+                opt = self.hardware.options(r,c)
+                if opt:
+                    nrow.append(opt)
+                nrow.append((r, c, k))
+            nrows.append(nrow)
+
+        out = []
+        for layer in self.layers.keys():
+            out.append(f'[{{a:7,w:20,h:1,d:true,t:"#000000",f:5}},"<hr/>Layer: {layer}<br />"]')
+            out.append(f'[{{y:-1,d:true,t:"#ff0000",f:3}}, "<br />"]')
+            for r in nrows:
+                row = []
+                for k in r:
+                    if isinstance(k, str):
+                        row.append(k)
+                    else:
+                        row.append(self.keycap(*k, only_layer=layer))
+                out.append("[" + ",".join(row) + "]")
+            out.append('[{y:1,d:true}, "<br />"]')
+
+        out.append(f'[{{f:4,w:20,h:3,d:true,y:1,t:"#000000"}},"{self.name}<br /><br />{self.hardware.description}"]')
+        return ",\n".join(out)
+
+    def build_combined(self) -> str:
         hw = self.layers['defsrc'].rows
         nrows = []
         for r, row in enumerate(hw):
@@ -406,9 +460,9 @@ class QMKKeymapFile:
         out.append(f'[{{f:4,w:20,h:3,d:true,t:"#333333",y:1}},"{self.name}<br /><br />{self.hardware.description}"]')
         return ",\n".join(out)
 
-    def keycap(self, row, col, key):
+    def keycap(self, row, col, key, only_layer=None):
         labels = {layer.name: layer(row, col) for layer in self.layers.values()}
-        return self.hardware.keycap.label(labels)
+        return self.hardware.keycap.label(labels, only_layer)
 
     def __str__(self) -> str:
         return f"{self.layers}\n{self.hardware}"
