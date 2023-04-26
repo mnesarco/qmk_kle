@@ -90,6 +90,7 @@ code_aliases = {
     "QUES": "?",
     "CIRC": "^",
     "TILD": "~",
+    "NTIL": "Ñ",
     "MS_L": "←m",
     "MS_D": "↓m",
     "MS_U": "↑m",
@@ -98,6 +99,8 @@ code_aliases = {
     "WH_D": "↓s",
     "WH_U": "↑s",
     "WH_R": "→s",
+    "ACUT": "´",
+    "COLN": ":",
 }
 
 # +-------------------------------------------------------------------------+
@@ -255,7 +258,7 @@ class KeyCap:
         return f'"{content}"'
 
     def translate(self, key):
-        if key.startswith('KC_'):
+        if re.match('^[A-Z]{2}_[A-Z0-9_]+$', key):
             key = key[3:]
         key_t = code_aliases.get(key, None)
         if not key_t:
